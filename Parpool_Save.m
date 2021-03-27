@@ -1,4 +1,4 @@
-function Parallel_Processing_Save(File_Path, Variables)
+function Parpool_Save(File_Path, Variables)
     Attempt_Directory_Creation(fileparts(File_Path));
     %Attempt to save structure if the structure is scalar
     if(isstruct(Variables))
