@@ -1,80 +1,85 @@
 %% Safely creates parpool by force-limiting the maximum number of cores used
 function Current_Pool = Parpool_Create(Num_Cores)
-    %Get number of cores the current machine has
-    Max_Number_Cores = Parpool_Max_Cores();
-    if(Max_Number_Cores == 0)
-        disp("Parpool_Create Warning: Failed to obtain the number of cores available; unable to validate further checks on number of cores.");
-    end
-    %If no input supplied, use all cores possible
-    if(nargin == 0)
+    %Only execute parallel tasks if the toolbox is installed and licenced
+    if(Parpool_Toolbox_Usable())
+        %Get the maximum number of cores the current machine has access to (physical / logical / cluster)
+        Max_Number_Cores = Parpool_Max_Cores();
         if(Max_Number_Cores == 0)
-            error("Parpool_Create Error: Number of cores not specified and automatic determination for maximum number of cores failed; stopping execution");
-        else
-            Num_Cores = Max_Number_Cores;
+            disp("Parpool_Create Warning: Failed to obtain the number of cores available; unable to validate further checks on number of cores.");
         end
-    end
-    %Force numeric datatype to uint16
-    if(isnumeric(Num_Cores))
-        if(~isinteger(Num_Cores))
-            Num_Cores = uint16(Num_Cores);
+        %If no input supplied, use all cores possible
+        if(nargin == 0)
+            if(Max_Number_Cores == 0)
+                error("Parpool_Create Error: Number of cores not specified and automatic determination for maximum number of cores failed; stopping execution");
+            else
+                Num_Cores = Max_Number_Cores;
+            end
         end
-    end
-    %Verify input for number of cores / switch to maximum number of cores
-    if(isinteger(Num_Cores))
-        if(Num_Cores > 0)
-            %Ensure the requested core count is lower than required
-            if(Max_Number_Cores > 0)
-                if(Num_Cores > Max_Number_Cores)
-                    Num_Cores = Max_Number_Cores;
-                    disp("Parpool_Create Warning: Specified number of cores larger than maximum number of cores; using maximum number of cores instead.");
+        %Force numeric datatype to uint16
+        if(isnumeric(Num_Cores))
+            if(~isinteger(Num_Cores))
+                Num_Cores = uint16(Num_Cores);
+            end
+        end
+        %Verify input for number of cores / switch to maximum number of cores
+        if(isinteger(Num_Cores))
+            if(Num_Cores > 0)
+                %Ensure the requested core count is lower than required
+                if(Max_Number_Cores > 0)
+                    if(Num_Cores > Max_Number_Cores)
+                        Num_Cores = Max_Number_Cores;
+                        disp("Parpool_Create Warning: Specified number of cores larger than maximum number of cores; using maximum number of cores instead.");
+                    else
+                        %Using manually specified number of cores with validation from Max_Number_Cores
+                    end
                 else
-                    %Using manually specified number of cores with validation from Max_Number_Cores
+                    %Using manually specified number of cores without validation from Max_Number_Cores
                 end
             else
-                %Using manually specified number of cores without validation from Max_Number_Cores
+                if(Max_Number_Cores > 0)
+                    Num_Cores = Max_Number_Cores;
+                    disp("Parpool_Create Warning: Number of cores required to be an integer greater than 0, using maximum number of cores instead.");
+                else
+                    error("Parpool_Create Error: Number of cores required to be an integer greater than 0 and invalid maximum number of cores; stopping execution.");
+                end
             end
         else
             if(Max_Number_Cores > 0)
                 Num_Cores = Max_Number_Cores;
-                disp("Parpool_Create Warning: Number of cores required to be an integer greater than 0, using maximum number of cores instead.");
+                disp("Parpool_Create Warning: Number of cores required to be an integer, using maximum number of cores instead.");
             else
-                error("Parpool_Create Error: Number of cores required to be an integer greater than 0 and invalid maximum number of cores; stopping execution.");
+                error("Parpool_Create Error: Number of cores required to be an integer and invalid maximum number of cores; stopping execution.");
             end
         end
-    else
-        if(Max_Number_Cores > 0)
-            Num_Cores = Max_Number_Cores;
-            disp("Parpool_Create Warning: Number of cores required to be an integer, using maximum number of cores instead.");
-        else
-            error("Parpool_Create Error: Number of cores required to be an integer and invalid maximum number of cores; stopping execution.");
-        end
-    end
-    %Get current parpool (if an instance exists), but don't create a new instance
-    Current_Pool = gcp('nocreate');
-    %If a parpool already exists
-    if(~isempty(Current_Pool))
-        %If the requested number of cores is different from the existing pool
-        if(Num_Cores == Current_Pool.NumWorkers)
-            %Core count is identical, no need to re-create the pool
-            Parpool_Creation_Allowed = false;
-            disp("Parpool_Create Info: Identical parpool already exists, ignoring creation.");
-        else
-            %Delete current pool if one already exists, core count is different
-            Parpool_Creation_Allowed = Parpool_Delete();
-            if(~Parpool_Creation_Allowed)
-                disp("Parpool_Create Warning: Failed to create new parpool due to another pool already existing.");
-            end
-        end
-    else
-        %No parpool exists
-        Parpool_Creation_Allowed = true;
-    end
-    %Create pool if one doesn't already exist
-    if(Parpool_Creation_Allowed)
-        %Create parallel Pool
-        Current_Pool = parpool(Num_Cores);
-    else
+        %Get current parpool (if an instance exists), but don't create a new instance
         Current_Pool = gcp('nocreate');
+        %If a parpool already exists
+        if(~isempty(Current_Pool))
+            %If the requested number of cores is different from the existing pool
+            if(Num_Cores == Current_Pool.NumWorkers)
+                %Core count is identical, no need to re-create the pool
+                Parpool_Creation_Allowed = false;
+                disp("Parpool_Create Info: Identical parpool already exists, ignoring creation.");
+            else
+                %Delete current pool if one already exists, core count is different
+                Parpool_Creation_Allowed = Parpool_Delete();
+                if(~Parpool_Creation_Allowed)
+                    disp("Parpool_Create Warning: Failed to create new parpool due to another pool already existing.");
+                end
+            end
+        else
+            %No parpool exists
+            Parpool_Creation_Allowed = true;
+        end
+        %Create pool if one doesn't already exist
+        if(Parpool_Creation_Allowed)
+            %Create parallel Pool
+            Current_Pool = parpool(Num_Cores);
+        else
+            Current_Pool = gcp('nocreate');
+        end
+    else
+        warning("Parallel Processing Toolbox Required");
     end
     
     %% Safely obtain the maximum number of cores / threads available to matlab.
